@@ -27,7 +27,7 @@ import "@pythnetwork/entropy-sdk-solidity/IEntropyV2.sol";
 import "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
 
 /**
- * @title CrashGame (working title)
+ * @title Moonshot - On-chain Crash Game
  * @author Christoph Drescher
  * @notice This game is designed to allow users to bet on a multiplier that increases over time and crashes at a random point.
  * The random crash point is determined using the Pyth Entropy oracle, ensuring fairness and unpredictability.
@@ -40,14 +40,25 @@ import "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
  * The game runs automatically in rounds, with each round starting 30-60 seconds after the previous one ends.
  * Players can join a round by placing a bet before the round starts.
  * The automatic round management is managed by a Chainlink Upkeep (automation) which calls the necessary functions to start a new round and resolve the previous one.
+ * 
+ * WORKFLOW:
+ * 1. startRound() - Called by Chainlink Upkeep to start a new round. Sets the start time and increments the round ID. Users can now place bets for this round.
+ * 2. placeBet() - Called by users to place a bet for the current round. Users specify the bet amount, target multiplier, and optional auto cashout multiplier.
+ *   
  */
 contract CrashGame is IEntropyConsumer {
+
+    enum RoundState {
+        OPEN,
+        LOCKED,
+        RESOLVED
+    }
 
     struct Round {
         uint256 id;
         uint256 startTime;
         uint256 crashMultiplier; // 1.00x–∞
-        bool resolved;
+        RoundState state;
     }
 
     struct Bet {
@@ -60,12 +71,35 @@ contract CrashGame is IEntropyConsumer {
 
     IEntropyV2 entropy;
 
+    uint256 public currentRoundId;
+    mapping(uint256 => Round) public rounds;
+    mapping(uint256 roundId => mapping(address player => Bet bet)) public bets;
+
+    //////////////
+    // Events
+    //////////////
+    event RoundStarted(uint256 roundId, uint256 startTime);
+    event BetPlaced(uint256 roundId, address player, uint256 amount, uint256 targetMultiplier, uint256 autoCashout);
+    event RoundLocked(uint256 roundId, uint256 lockTime);
     event FlipRequested(uint64 sequenceNumber);
     event FlipResult(uint64 sequenceNumber, bool isHeads);
+
+    //////////////
+    // Modifier
+    //////////////
+
+    modifier onlyAutomation() {
+        // check if the caller is the Chainlink Upkeep (automation) address
+        _;
+    }
 
     constructor(address _entropy) {
         entropy = IEntropyV2(_entropy);
     }
+
+    ///////////////////////////
+    // Pyth Entropy Functions
+    //////////////////////////
 
     // This method is required by the IEntropyConsumer interface
     function getEntropy() internal view override returns (address) {
@@ -97,4 +131,64 @@ contract CrashGame is IEntropyConsumer {
 
         emit FlipResult(sequenceNumber, isHeads);
     }
+
+    ////////////////////////////////////
+    // External Public Game Mechanics
+    ///////////////////////////////////
+
+    function startRound() external onlyAutomation {
+        require(
+            currentRoundId == 0 || rounds[currentRoundId].state == RoundState.RESOLVED,
+            "Previous round not resolved"
+        );
+        currentRoundId++;
+        rounds[currentRoundId] = Round({
+            id: currentRoundId,
+            startTime: block.timestamp,
+            crashMultiplier: 0,
+            state: RoundState.OPEN
+        });
+        emit RoundStarted(currentRoundId, block.timestamp);
+    }
+
+    function lockRoundAndCallPyth() external onlyAutomation {
+        require(rounds[currentRoundId].state == RoundState.OPEN, "Round not open");
+        rounds[currentRoundId].state = RoundState.LOCKED;
+
+        emit RoundLocked(currentRoundId, block.timestamp);
+
+        // Request random number from Pyth Entropy (private function)
+    }
+
+    function placeBet(uint256 amount, uint256 targetMultiplier, uint256 autoCashout) external payable {
+        uint256 pythFee = entropy.getFeeV2();
+        require(msg.value >= amount + pythFee, "Not enough ETH sent");
+        require(rounds[currentRoundId].state == RoundState.OPEN, "Round not open");
+        require(amount > 0, "Bet amount must be greater than 0");
+        require(targetMultiplier >= 100, "Target multiplier must be at least 1.00x");
+        require(autoCashout > amount, "Auto cashout must be greater than bet amount");
+        require(bets[currentRoundId][msg.sender].amount == 0, "Bet already placed for this round");
+        
+        bets[currentRoundId][msg.sender] = Bet({
+            roundId: currentRoundId,
+            amount: amount,
+            targetMultiplier: targetMultiplier,
+            autoCashout: autoCashout,
+            claimed: false
+        });
+
+        emit BetPlaced(currentRoundId, msg.sender, amount, targetMultiplier, autoCashout);
+    }
+
+    function requestCrashResult() external onlyAutomation {}
+
+    function claimWinnings() external {}
+
+    ////////////////////////////////////
+    // Internal Game Mechanics
+    ///////////////////////////////////
+
+
 }
+    
+
