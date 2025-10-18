@@ -8,13 +8,17 @@
     "start": "next start"
   },
   "dependencies": {
+    "@pythnetwork/entropy-sdk-solidity": "^2.0.0",
     "@rainbow-me/rainbowkit": "^2.2.9",
     "@tanstack/react-query": "^5.90.3",
+    "ethers": "^6.15.0",
     "next": "15.5.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-icons": "^5.5.0",
     "viem": "^2.38.2",
-    "wagmi": "^2.18.1"
+    "wagmi": "^2.18.1",
+    "web3": "^4.16.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
