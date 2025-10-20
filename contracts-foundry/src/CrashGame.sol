@@ -165,7 +165,7 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         s_rounds[s_currentRoundId].crashMultiplier = crashMultiplier;
         s_rounds[s_currentRoundId].state = RoundState.RESOLVED;
 
-        emit RoundCrashed(block.timestamp, crashMultiplier);
+        emit RoundCrashed(s_currentRoundId, block.timestamp, crashMultiplier);
     }
 
     ////////////////////////////////////
@@ -212,7 +212,7 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
             s_rounds[s_currentRoundId].state == RoundState.OPEN,
             "Round not open"
         );
-        require(s_bets[s_currentRoundId][user] == null, "already placed a bet on this round");
+        require(s_bets[s_currentRoundId][msg.sender].amount == 0, "already placed a bet on this round");
         require(amount > 0, "Bet amount must be greater than 0");
         require(
             targetMultiplier >= 100,
@@ -264,7 +264,7 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         require(s_rounds[s_currentRoundId].state == RoundState.RESOLVED, "Current Round is not resolved yet");
         require(s_bets[s_currentRoundId][msg.sender].targetMultiplier < s_rounds[s_currentRoundId].crashMultiplier, "Not claimable");
 
-        uint256 claim = s_bets[s_currentRoundId][msg.sender].amount * (s_rounds[s_currentRoundId].targetMultiplier / 100);
+        uint256 claim = s_bets[s_currentRoundId][msg.sender].amount * (s_bets[s_currentRoundId][msg.sender].targetMultiplier / 100);
         s_bets[s_currentRoundId][msg.sender].claimed = true;
 
         (bool success, ) = msg.sender.call{value: claim}("");
@@ -274,7 +274,7 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         
     } 
 
-    function withdraw() external OnlyOwner {
+    function withdraw() external onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No funds to withdraw");
         payable(i_owner).transfer(balance);
@@ -292,12 +292,12 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         return s_rounds[s_currentRoundId].crashMultiplier;
     }
 
-    function getCurrentUserBet(address _user) public view returns (Bet) {
-        require(s_bets[s_currentRoundId][user] != null, "This user has not placed a bet on this round");
-        return s_bets[s_currentRoundId][user];
+    function getCurrentUserBet(address _user) public view returns (Bet memory) {
+        require(s_bets[s_currentRoundId][_user].amount != 0, "This user has not placed a bet on this round");
+        return s_bets[s_currentRoundId][_user];
     }
 
-    function getLastRoundResult() public view returns (Round) {
+    function getLastRoundResult() public view returns (Round memory) {
         return s_rounds[s_currentRoundId-1];
     }
 
