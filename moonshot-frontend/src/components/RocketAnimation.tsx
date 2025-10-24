@@ -10,7 +10,7 @@ export default function RocketAnimation() {
         const interval = setInterval(() => {
             setFrameIdx((prev) => (prev + 1) % 6);
             setCounter((prev) => (prev - 0.1));
-        }, counter);
+        }, 100); // counter
 
         return () => clearInterval(interval);
     }, [counter]);

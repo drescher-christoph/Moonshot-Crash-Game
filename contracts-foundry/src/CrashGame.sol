@@ -48,6 +48,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  *
  */
 contract CrashGame is IEntropyConsumer, ReentrancyGuard {
+
     enum RoundState {
         OPEN,
         LOCKED,
@@ -58,6 +59,8 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         uint256 id;
         uint256 startTime;
         uint256 crashMultiplier; // 1.00x–∞
+        uint256 crashTime;
+        uint256 lockTime;
         RoundState state;
     }
 
@@ -70,17 +73,24 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
     }
 
     address immutable i_owner;
+    uint256 private constant BPS_DENOMINATOR = 10_000;
 
     IEntropyV2 entropy;
-    address public s_startRoundUpKeep;
-    address public s_lockRoundUpkeep;
+    address private s_upkeep;
     uint256 public s_currentRoundId;
+    uint256 public s_feesCollected;
+    uint256 public s_betDuration = 60;
+    uint256 public s_cooldown = 30;
+    uint256 public s_feeBasisPoints = 200; // = 2%
     mapping(uint256 => Round) public s_rounds;
-    mapping(uint256 roundId => mapping(address player => Bet bet)) public s_bets;
+    mapping(uint256 roundId => mapping(address player => Bet bet))
+        public s_bets;
+    mapping(uint256 roundId => uint256 betCount) public s_betCount;
 
     //////////////
     // Events
     //////////////
+    event FundsReceived(address sender, uint256 funds);
     event RoundStarted(uint256 roundId, uint256 startTime);
     event BetPlaced(
         uint256 roundId,
@@ -90,18 +100,29 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         uint256 autoCashout
     );
     event RoundLocked(uint256 indexed roundId, uint256 lockTime);
-    event RoundCrashed(uint256 indexed roundId, uint256 crashTimeStamp, uint256 crashMultiplier);
+    event RoundCrashed(
+        uint256 indexed roundId,
+        uint256 crashTimeStamp,
+        uint256 crashMultiplier
+    );
     event FlipRequested(uint64 sequenceNumber);
     event FlipResult(uint64 sequenceNumber, bool isHeads);
     event UpkeepUpdated(address oldUpkeep, address newUpkeep);
-    event WinningsClaimed(address indexed user, uint256 indexed roundId, uint256 payoutAmount);
+    event WinningsClaimed(
+        address indexed user,
+        uint256 indexed roundId,
+        uint256 payoutAmount
+    );
 
     //////////////
     // Modifier
     //////////////
 
     modifier onlyAutomation() {
-        require(msg.sender == s_startRoundUpKeep || msg.sender == s_lockRoundUpkeep, "Only an upkeep is allowed to call this method");
+        require(
+            msg.sender == s_upkeep,
+            "Only an upkeep is allowed to call this method"
+        );
         _;
     }
 
@@ -118,18 +139,22 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         entropy = IEntropyV2(_entropy);
     }
 
-    function setOrUpdateStartUpkeepAddress(address _newUpKeep) public onlyOwner {
-        address oldUpkeep = s_startRoundUpKeep;
-        s_startRoundUpKeep = _newUpKeep;
-
-        emit UpkeepUpdated(oldUpkeep, _newUpKeep);
+    receive() external payable {
+        emit FundsReceived(msg.sender, msg.value);
     }
 
-    function setOrUpdateLockUpkeepAddress(address _newUpKeep) public onlyOwner {
-        address oldUpkeep = s_lockRoundUpkeep;
-        s_lockRoundUpkeep = _newUpKeep;
+    function updateTimings(
+        uint256 _betDuration,
+        uint256 _cooldown
+    ) external onlyOwner {
+        s_betDuration = _betDuration;
+        s_cooldown = _cooldown;
+    }
 
-        emit UpkeepUpdated(oldUpkeep, _newUpKeep);
+    function setOrUpdateUpkeepAddress(address _upkeep) external onlyOwner {
+        address oldUpkeep = s_upkeep;
+        s_upkeep = _upkeep;
+        emit UpkeepUpdated(oldUpkeep, _upkeep);
     }
 
     ///////////////////////////
@@ -159,20 +184,48 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         address _providerAddress,
         bytes32 randomNumber
     ) internal override {
+        require(
+            s_rounds[s_currentRoundId].state == RoundState.LOCKED,
+            "Round not locked or already resolved"
+        );
         bool isHeads = uint256(randomNumber) % 2 == 0;
 
         uint256 crashMultiplier = _calculateCrashResult(randomNumber);
         s_rounds[s_currentRoundId].crashMultiplier = crashMultiplier;
+        s_rounds[s_currentRoundId].crashTime = block.timestamp;
         s_rounds[s_currentRoundId].state = RoundState.RESOLVED;
 
         emit RoundCrashed(s_currentRoundId, block.timestamp, crashMultiplier);
     }
 
+    //////////////
+    // Upkeep
+    //////////////
+
+    function checkUpkeep() external onlyAutomation {
+        RoundState state = getCurrentRoundState();
+        uint256 lastStart = getCurrentRoundStartTime();
+        uint256 crashTime = getCurrentRoundCrashTime();
+        uint256 betCount = s_betCount[s_currentRoundId];
+        if (
+            state == RoundState.OPEN &&
+            block.timestamp >= lastStart + s_betDuration && betCount > 0
+        ) {
+            _lockRoundAndCallPyth();
+        } else if (
+            s_currentRoundId == 0 ||
+            (state == RoundState.RESOLVED &&
+                block.timestamp >= crashTime + s_cooldown)
+        ) {
+            _startRound();
+        }
+    }
+
     ////////////////////////////////////
-    // External Public Game Mechanics
+    // Game Mechanics
     ///////////////////////////////////
 
-    function startRound() external onlyAutomation {
+    function _startRound() internal {
         require(
             s_currentRoundId == 0 ||
                 s_rounds[s_currentRoundId].state == RoundState.RESOLVED,
@@ -183,17 +236,20 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
             id: s_currentRoundId,
             startTime: block.timestamp,
             crashMultiplier: 0,
+            crashTime: 0,
+            lockTime: 0,
             state: RoundState.OPEN
         });
         emit RoundStarted(s_currentRoundId, block.timestamp);
     }
 
-    function lockRoundAndCallPyth() external onlyAutomation {
+    function _lockRoundAndCallPyth() internal {
         require(
             s_rounds[s_currentRoundId].state == RoundState.OPEN,
             "Round not open"
         );
         s_rounds[s_currentRoundId].state = RoundState.LOCKED;
+        s_rounds[s_currentRoundId].lockTime = block.timestamp;
 
         emit RoundLocked(s_currentRoundId, block.timestamp);
 
@@ -206,13 +262,15 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         uint256 targetMultiplier,
         uint256 autoCashout
     ) external payable nonReentrant {
-        uint256 pythFee = entropy.getFeeV2();
-        require(msg.value >= amount + pythFee, "Not enough ETH sent");
+        require(msg.value >= amount, "Not enough ETH sent");
         require(
             s_rounds[s_currentRoundId].state == RoundState.OPEN,
             "Round not open"
         );
-        require(s_bets[s_currentRoundId][msg.sender].amount == 0, "already placed a bet on this round");
+        require(
+            s_bets[s_currentRoundId][msg.sender].amount == 0,
+            "already placed a bet on this round"
+        );
         require(amount > 0, "Bet amount must be greater than 0");
         require(
             targetMultiplier >= 100,
@@ -234,6 +292,7 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
             autoCashout: autoCashout,
             claimed: false
         });
+        s_betCount[s_currentRoundId]++;
 
         emit BetPlaced(
             s_currentRoundId,
@@ -244,7 +303,9 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         );
     }
 
-    function _calculateCrashResult(bytes32 _randomBytes) internal pure returns (uint256) {
+    function _calculateCrashResult(
+        bytes32 _randomBytes
+    ) internal pure returns (uint256) {
         uint256 randomInt = uint256(_randomBytes);
         if (randomInt % 33 == 0) {
             return 100;
@@ -260,24 +321,39 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         return crash / 100;
     }
 
-    function claimWinnings() external nonReentrant {
-        require(s_rounds[s_currentRoundId].state == RoundState.RESOLVED, "Current Round is not resolved yet");
-        require(s_bets[s_currentRoundId][msg.sender].targetMultiplier < s_rounds[s_currentRoundId].crashMultiplier, "Not claimable");
+    function claimWinnings(uint256 _roundId) external nonReentrant {
+        require(
+            s_rounds[_roundId].state == RoundState.RESOLVED,
+            "Current Round is not resolved yet"
+        );
+        require(
+            s_bets[_roundId][msg.sender].targetMultiplier <
+                s_rounds[_roundId].crashMultiplier,
+            "Not claimable"
+        );
 
-        uint256 claim = s_bets[s_currentRoundId][msg.sender].amount * (s_bets[s_currentRoundId][msg.sender].targetMultiplier / 100);
-        s_bets[s_currentRoundId][msg.sender].claimed = true;
+        uint256 claim = s_bets[_roundId][msg.sender].amount *
+            (s_bets[_roundId][msg.sender].targetMultiplier / 100);
+        uint256 fee = (claim * s_feeBasisPoints) / BPS_DENOMINATOR;
+        s_feesCollected += fee;
+        uint256 payout = claim - fee;
+        s_bets[_roundId][msg.sender].claimed = true;
 
-        (bool success, ) = msg.sender.call{value: claim}("");
+        (bool success, ) = msg.sender.call{value: payout}("");
         require(success, "Payout failed!");
 
-        emit WinningsClaimed(msg.sender, s_currentRoundId, claim);
-        
-    } 
+        emit WinningsClaimed(msg.sender, _roundId, claim);
+    }
 
     function withdraw() external onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No funds to withdraw");
         payable(i_owner).transfer(balance);
+    }
+
+    function withdrawFees() external onlyOwner {
+        require(s_feesCollected > 0, "No funds to withdraw");
+        payable(i_owner).transfer(s_feesCollected);
     }
 
     ////////////////////////////////////
@@ -288,17 +364,28 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         return s_rounds[s_currentRoundId].state;
     }
 
+    function getCurrentRoundStartTime() public view returns (uint256) {
+        return s_rounds[s_currentRoundId].startTime;
+    }
+
+    function getCurrentRoundCrashTime() public view returns (uint256) {
+        return s_rounds[s_currentRoundId].crashTime;
+    }
+
     function getCrashMultiplier() public view returns (uint256) {
         return s_rounds[s_currentRoundId].crashMultiplier;
     }
 
     function getCurrentUserBet(address _user) public view returns (Bet memory) {
-        require(s_bets[s_currentRoundId][_user].amount != 0, "This user has not placed a bet on this round");
+        require(
+            s_bets[s_currentRoundId][_user].amount != 0,
+            "This user has not placed a bet on this round"
+        );
         return s_bets[s_currentRoundId][_user];
     }
 
     function getLastRoundResult() public view returns (Round memory) {
-        return s_rounds[s_currentRoundId-1];
+        return s_rounds[s_currentRoundId - 1];
     }
 
 }

@@ -30,7 +30,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <div className="flex min-h-screen flex-col">
+          <div className="flex min-h-screen flex-col bg-cover bg-center" style={{ backgroundImage: "url('/images/bg_space.png')" }}>
             <Header />
             {children}
           </div>

@@ -19,6 +19,15 @@ interface BetResult {
   crashTimeStamp: bigint;
 }
 
+interface Round {
+  id: bigint;
+  startTime: bigint;
+  lockTime: bigint;
+  crashTime: bigint;
+  crashMultiplier: bigint;
+  state: number;
+}
+
 interface Bet {
   roundId: bigint;
   amount: bigint;
@@ -31,6 +40,7 @@ export default function Home() {
   const { address, isConnected } = useAccount();
   const { writeContract, data: txHash } = useWriteContract();
   const currentRound = 1;
+  const [round, setRound] = useState<Round | null>(null);
   const [bet, setBet] = useState<Bet | null>(null);
   const [crash, setCrash] = useState<BetResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -163,6 +173,68 @@ export default function Home() {
     },
   });
 
+  useWatchContractEvent({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    eventName: "RoundStarted",
+    onLogs(logs) {
+      console.log("Round started!");
+      logs.forEach((log) => {
+        if ("args" in log) {
+          const args = log.args as {
+            roundId: bigint;
+            startTime: bigint;
+          };
+          setRound({
+            id: args.roundId,
+            startTime: args.startTime,
+            lockTime: BigInt(0),
+            crashTime: BigInt(0),
+            crashMultiplier: BigInt(0),
+            state: 0,
+          });
+          console.log("Started new round: : ", round);
+        }
+      });
+    },
+  });
+
+  useWatchContractEvent({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    eventName: "RoundLocked",
+    onLogs(logs) {
+      console.log("Round locked!");
+      logs.forEach((log) => {
+        if ("args" in log) {
+          const args = log.args as {
+            roundId: bigint;
+            lockTime: bigint;
+          };
+          setRound((prev) => {
+            if (prev) {
+              return {
+                ...prev,
+                lockTime: args.lockTime,
+                state: 1,
+              };
+            } else {
+              return {
+                id: args.roundId,
+                startTime: BigInt(0),
+                lockTime: args.lockTime,
+                crashTime: BigInt(0),
+                crashMultiplier: BigInt(0),
+                state: 0,
+              }
+            }});
+          console.log("Started new round: : ", round);
+        }
+      });
+    },
+  });
+
+
   async function placeBet() {
     const value = ethers.parseEther((betAmount as string) || "0");
     const autoCashOutMultiplier = (targetMultiplier as number) * 100;
@@ -172,7 +244,7 @@ export default function Home() {
         address: CONTRACT_ADDRESS,
         functionName: "placeBet",
         args: [value, autoCashOutMultiplier, value + value],
-        value: entropyFee ? entropyFee + value : value + value * BigInt(0.1),
+        value: value,
       });
     } catch (err) {
       console.log("Error placing bet: ", err);
@@ -193,10 +265,17 @@ export default function Home() {
   }
 
   return (
-    <div
+    <div className="flex flex-col items-center justify-center"
       style={{ fontFamily: "sans-serif", textAlign: "center", marginTop: 50 }}
     >
       <h1 className="font-bold text-4xl">CrashGame UI ⚡️</h1>
+      <Image
+        src="/images/logo.png"
+        alt="Coinflip Logo"
+        width={150}
+        height={150}
+        priority
+      />
       {isConnected ? (
         <>
           <p>Current Round ID: {currentRoundId?.toString()}</p>
@@ -204,7 +283,7 @@ export default function Home() {
           <h2>Round State: {ROUND_STATES[currentRoundState as any]}</h2>
           <h2>
             Crash:{" "}
-            {crashMultiplier ? (crashMultiplier as any) : "No yet confirmed"}
+            {crashMultiplier ? `${((crashMultiplier as any) / 100 as any)}x` : "No yet confirmed"}
           </h2>
 
           {currentRoundState === 0 && (
