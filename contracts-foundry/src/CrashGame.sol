@@ -372,6 +372,10 @@ contract CrashGame is IEntropyConsumer, ReentrancyGuard {
         return s_rounds[s_currentRoundId].crashTime;
     }
 
+    function getCurrentRoundLockTime() public view returns (uint256) {
+        return s_rounds[s_currentRoundId].lockTime;
+    }
+
     function getCrashMultiplier() public view returns (uint256) {
         return s_rounds[s_currentRoundId].crashMultiplier;
     }
