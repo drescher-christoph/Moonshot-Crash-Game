@@ -2,6 +2,8 @@
 import Image from "next/image";
 import RocketAnimation from "../components/RocketAnimation";
 import GameDisplay from "@/components/GameDisplay";
+import { PlaceBetForm } from "@/components/PlaceBetForm";
+import { ClaimWinnings } from "@/components/ClaimWinnings";
 import { useEffect, useState, useCallback, useRef, use } from "react";
 import { ethers } from "ethers";
 import {
@@ -11,42 +13,56 @@ import {
   useWriteContract,
   useWatchContractEvent,
 } from "wagmi";
+import { useGameState } from "@/hooks/useGameState";
 import { readContract } from "wagmi/actions";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/constants";
 import EntropyAbi from "@pythnetwork/entropy-sdk-solidity/abis/IEntropyV2.json";
 
-
-/* -------------------- Component -------------------- */
 export default function Home() {
   const { address, isConnected } = useAccount();
   const wagmiConfig = useConfig();
+  const { currentRoundId, roundState, crashMultiplier } = useGameState();
 
-  /* -------------------- Render -------------------- */
   return (
-    <div
-      className="flex flex-col items-center justify-center"
-      style={{ fontFamily: "sans-serif", textAlign: "center", marginTop: 50 }}
-    >
-      <h1 className="font-bold text-4xl text-white">Moonshot — Crash Game ⚡️</h1>
-
-      <Image
-        src="/images/logo.png"
-        alt="Moonshot Logo"
-        width={150}
-        height={150}
-      />
-
-      {isConnected ? (
-        <>
-          <GameDisplay />
-        </>
-      ) : (
-        <div style={{ marginTop: 20 }}>
-          <p>Please connect wallet to play</p>
-          <RocketAnimation />
+    <main className="min-h-screen p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex flex-col text-center items-center space-y-2">
+          <Image
+            src="/images/logo.png"
+            alt="Moonshot Logo"
+            width={150}
+            height={150}
+            priority
+          />
+          <p className="text-muted-foreground">
+            On-chain Crash Game powered by Pyth Entropy
+          </p>
         </div>
-      )}
 
-    </div>
+        {/* Game Display */}
+        {isConnected ? (
+          <>
+            <GameDisplay />
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <PlaceBetForm
+                roundState={roundState}
+                currentRoundId={currentRoundId}
+              />
+              <ClaimWinnings
+                roundId={currentRoundId}
+                roundState={roundState}
+                crashMultiplier={crashMultiplier}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="text-center text-muted-foreground">
+            Please connect your wallet to participate in the game.
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
