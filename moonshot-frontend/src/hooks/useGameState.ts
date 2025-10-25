@@ -242,12 +242,13 @@ import { CONTRACT_ABI, CONTRACT_ADDRESS, RoundState } from "../constants"
 import { useEffect, useState, useRef } from "react"
 
 type RoundData = readonly [
-    startTime: bigint,
-    lockTime: bigint,
-    crashTime: bigint,
-    crashMultiplier: bigint,
-    state: number,
-  ]
+  id: bigint,
+  startTime: bigint,
+  crashMultiplier: bigint,
+  crashTime: bigint,
+  lockTime: bigint,
+  state: number,
+]
 
 export function useGameState() {
   const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000))

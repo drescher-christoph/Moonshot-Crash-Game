@@ -62,7 +62,7 @@ export default function GameDisplay() {
     <div className="w-full max-w-4xl mx-auto space-y-6">
       {/* Status Badge */}
       <div className="flex justify-center">
-        <GameStatusBadge state={roundState} />
+        <GameStatusBadge state={roundState as number} />
       </div>
 
       {/* Main Display Card */}
@@ -71,8 +71,8 @@ export default function GameDisplay() {
           {/* Multiplier or Timer */}
           <MultiplierDisplay
             crashMultiplier={crashMultiplier}
-            roundState={roundState}
-            actualRoundState={actualRoundState}
+            roundState={roundState as number}
+            actualRoundState={actualRoundState as any}
             isAnimating={isAnimating}
             onAnimationComplete={handleAnimationComplete}
           />

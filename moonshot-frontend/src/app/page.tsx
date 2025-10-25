@@ -46,12 +46,12 @@ export default function Home() {
 
             <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
               <PlaceBetForm
-                roundState={roundState}
-                currentRoundId={currentRoundId}
+                roundState={roundState as number}
+                currentRoundId={currentRoundId as number}
               />
               <ClaimWinnings
                 roundId={currentRoundId}
-                roundState={actualRoundState ?? roundState}
+                roundState={actualRoundState ?? roundState as number}
                 crashMultiplier={crashMultiplier}
               />
             </div>
