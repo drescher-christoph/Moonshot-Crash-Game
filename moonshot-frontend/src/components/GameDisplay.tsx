@@ -1,6 +1,5 @@
 "use client";
 import Image from "next/image";
-import RocketAnimation from "../components/RocketAnimation";
 import { Card } from "./ui/card";
 import { useGameState } from "@/hooks/useGameState";
 import { GameInfoCard } from "./GameInfoCard";

@@ -1,6 +1,5 @@
 "use client";
 import Image from "next/image";
-import RocketAnimation from "../components/RocketAnimation";
 import GameDisplay from "@/components/GameDisplay";
 import { PlaceBetForm } from "@/components/PlaceBetForm";
 import { ClaimWinnings } from "@/components/ClaimWinnings";
@@ -21,7 +20,7 @@ import EntropyAbi from "@pythnetwork/entropy-sdk-solidity/abis/IEntropyV2.json";
 export default function Home() {
   const { address, isConnected } = useAccount();
   const wagmiConfig = useConfig();
-  const { currentRoundId, roundState, crashMultiplier } = useGameState();
+  const { currentRoundId, roundState, actualRoundState, crashMultiplier } = useGameState();
 
   return (
     <main className="min-h-screen p-4 md:p-8">
@@ -52,7 +51,7 @@ export default function Home() {
               />
               <ClaimWinnings
                 roundId={currentRoundId}
-                roundState={roundState}
+                roundState={actualRoundState ?? roundState}
                 crashMultiplier={crashMultiplier}
               />
             </div>

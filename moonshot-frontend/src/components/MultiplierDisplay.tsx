@@ -19,7 +19,11 @@ export function MultiplierDisplay({
   isAnimating,
   onAnimationComplete,
 }: MultiplierDisplayProps) {
-  if (isAnimating && actualRoundState === RoundState.RESOLVED && crashMultiplier > 0) {
+  if (
+    isAnimating &&
+    (actualRoundState === RoundState.RESOLVED || roundState === RoundState.RESOLVED) &&
+    crashMultiplier > 0
+  ) {
     return <AnimatedCrashMultiplier finalMultiplier={crashMultiplier} onAnimationComplete={onAnimationComplete} />
   }
 

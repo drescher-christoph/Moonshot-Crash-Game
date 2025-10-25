@@ -39,7 +39,22 @@ export function ClaimWinnings({
     if (isSuccess) {
       refetch();
     }
-  }, [isSuccess, refetch]);
+  }, [isSuccess, refetch, roundState]);
+
+  // Aggressiveres Polling für UI-Updates
+  useEffect(() => {
+    const updateInterval = setInterval(() => {
+      if (roundState !== null) {
+        refetch();
+      }
+    }, 500);
+
+    return () => clearInterval(updateInterval);
+  }, [roundState, refetch]);
+
+  useEffect(() => {
+    refetch();
+  }, [roundState, crashMultiplier]);
 
   const handleClaim = async () => {
     if (!isConnected || !address) {
@@ -74,7 +89,9 @@ export function ClaimWinnings({
 
   const isResolved = roundState === RoundState.RESOLVED;
   const isWinner = isResolved && targetMultiplier < crashMultiplier;
-  const payout = isWinner ? (Number(amount) * Number(targetMultiplier) / 100) : 0;
+  const payout = isWinner
+    ? (Number(amount) * Number(targetMultiplier)) / 100
+    : 0;
   const canClaim = isWinner && !claimed;
 
   return (

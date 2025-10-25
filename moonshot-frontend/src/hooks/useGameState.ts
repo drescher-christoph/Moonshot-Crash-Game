@@ -1,7 +1,7 @@
 "use client";
 
 import { useReadContract, useWatchContractEvent, useBlockNumber } from "wagmi";
-import { CONTRACT_ADDRESS, CONTRACT_ABI, RoundState } from "@/constants";
+import { CONTRACT_ABI, CONTRACT_ADDRESS, RoundState } from "../constants";
 import { useEffect, useState, useRef } from "react";
 
 export function useGameState() {
@@ -16,19 +16,20 @@ export function useGameState() {
 
   const { data: blockNumber } = useBlockNumber({ watch: true });
 
-  // Polls the current time every second
+  // Poll current time every second
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Math.floor(Date.now() / 1000));
-    }, 1000); // every second
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    console.log("Contract Address:", CONTRACT_ADDRESS);
-    console.log("Contract Address is valid:", !!CONTRACT_ADDRESS);
+    console.log("[v0] Contract Address:", CONTRACT_ADDRESS);
+    console.log("[v0] Contract Address is valid:", !!CONTRACT_ADDRESS);
   }, []);
 
+  // Read current round ID
   const {
     data: currentRoundId,
     refetch: refetchRoundId,
@@ -41,9 +42,9 @@ export function useGameState() {
   });
 
   useEffect(() => {
-    console.log("Current Round ID:", currentRoundId);
-    console.log("Round ID Loading:", roundIdLoading);
-    console.log("Round ID Error:", roundIdError);
+    console.log("[v0] Current Round ID:", currentRoundId);
+    console.log("[v0] Round ID Loading:", roundIdLoading);
+    console.log("[v0] Round ID Error:", roundIdError);
   }, [currentRoundId, roundIdLoading, roundIdError]);
 
   // Read bet duration
@@ -83,7 +84,7 @@ export function useGameState() {
       previousRoundIdRef.current !== null &&
       roundIdNum !== previousRoundIdRef.current
     ) {
-      console.log("New round detected, resetting animation state");
+      console.log("[v0] New round detected, resetting animation state");
       setIsAnimating(false);
       animationTriggeredRef.current = false;
       setPreviousRoundState(null);
@@ -112,12 +113,12 @@ export function useGameState() {
   }, [refetchRoundId, refetchRound, currentRoundId]);
 
   useEffect(() => {
-    console.log("Round Data:", roundData)
-    console.log("Round Loading:", roundLoading)
-    console.log("Round Error:", roundError)
-    console.log("Bet Duration:", betDuration)
-    console.log("Cooldown:", cooldown)
-  }, [roundData, roundLoading, roundError, betDuration, cooldown])
+    console.log("[v0] Round Data:", roundData);
+    console.log("[v0] Round Loading:", roundLoading);
+    console.log("[v0] Round Error:", roundError);
+    console.log("[v0] Bet Duration:", betDuration);
+    console.log("[v0] Cooldown:", cooldown);
+  }, [roundData, roundLoading, roundError, betDuration, cooldown]);
 
   // Watch for round events
   useWatchContractEvent({
@@ -125,31 +126,31 @@ export function useGameState() {
     abi: CONTRACT_ABI,
     eventName: "RoundStarted",
     onLogs() {
-      console.log("RoundStarted event detected")
-      refetchRoundId()
-      refetchRound()
+      console.log("[v0] RoundStarted event detected");
+      refetchRoundId();
+      refetchRound();
     },
-  })
+  });
 
   useWatchContractEvent({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     eventName: "RoundLocked",
     onLogs() {
-      console.log("RoundLocked event detected")
-      refetchRound()
+      console.log("[v0] RoundLocked event detected");
+      refetchRound();
     },
-  })
+  });
 
   useWatchContractEvent({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     eventName: "RoundCrashed",
     onLogs() {
-      console.log("RoundCrashed event detected")
-      refetchRound()
+      console.log("[v0] RoundCrashed event detected");
+      refetchRound();
     },
-  })
+  });
 
   const roundState = roundData ? (roundData as unknown[])[5] as number : null
   const startTime = roundData ? Number((roundData as unknown[])[1]) : 0
@@ -161,10 +162,10 @@ export function useGameState() {
     if (roundState !== null) {
       // If round is OPEN, always update display state immediately (new round started)
       if (roundState === RoundState.OPEN) {
-        console.log("[v0] Round is OPEN, updating display state")
-        setDisplayState(RoundState.OPEN)
-        setIsAnimating(false)
-        animationTriggeredRef.current = false
+        console.log("[v0] Round is OPEN, updating display state");
+        setDisplayState(RoundState.OPEN);
+        setIsAnimating(false);
+        animationTriggeredRef.current = false;
       }
       // Detect transition from LOCKED to RESOLVED for animation
       else if (
@@ -172,56 +173,58 @@ export function useGameState() {
         roundState === RoundState.RESOLVED &&
         !animationTriggeredRef.current
       ) {
-        console.log("Detected LOCKED -> RESOLVED transition, starting animation")
-        setIsAnimating(true)
-        setDisplayState(RoundState.LOCKED) // Keep showing LOCKED during animation
-        animationTriggeredRef.current = true // Prevent multiple triggers
+        console.log(
+          "[v0] Detected LOCKED -> RESOLVED transition, starting animation"
+        );
+        setIsAnimating(true);
+        setDisplayState(RoundState.LOCKED); // Keep showing LOCKED during animation
+        animationTriggeredRef.current = true; // Prevent multiple triggers
       }
       // Normal state update when not animating and not in a special transition
       else if (!isAnimating && !animationTriggeredRef.current) {
-        setDisplayState(roundState)
+        setDisplayState(roundState);
       }
 
-      setPreviousRoundState(roundState)
+      setPreviousRoundState(roundState);
     }
-  }, [roundState, previousRoundState, isAnimating])
+  }, [roundState, previousRoundState, isAnimating]);
 
   const handleAnimationComplete = () => {
-    console.log("Animation complete, updating display state to RESOLVED")
-    setIsAnimating(false)
-    setDisplayState(RoundState.RESOLVED)
+    console.log("[v0] Animation complete, updating display state to RESOLVED");
+    setIsAnimating(false);
+    setDisplayState(RoundState.RESOLVED);
     // Don't reset animationTriggeredRef here - it will be reset when new round starts
-  }
+  };
 
   // Calculate time remaining based on display state (not actual state during animation)
-  const stateForCalculation = displayState ?? roundState
-  let timeRemaining = 0
-  let nextPhase = ""
-  let isWaitingForUpdate = false
+  const stateForCalculation = displayState ?? roundState;
+  let timeRemaining = 0;
+  let nextPhase = "";
+  let isWaitingForUpdate = false;
 
   if (stateForCalculation === RoundState.OPEN && betDuration) {
-    const lockAt = startTime + Number(betDuration)
-    timeRemaining = Math.max(0, lockAt - currentTime)
-    nextPhase = "LOCK"
+    const lockAt = startTime + Number(betDuration);
+    timeRemaining = Math.max(0, lockAt - currentTime);
+    nextPhase = "LOCK";
     if (timeRemaining === 0 && stateForCalculation === RoundState.OPEN) {
-      isWaitingForUpdate = true
+      isWaitingForUpdate = true;
     }
   } else if (stateForCalculation === RoundState.LOCKED) {
-    timeRemaining = 0
-    nextPhase = "CRASH"
+    timeRemaining = 0;
+    nextPhase = "CRASH";
   } else if (stateForCalculation === RoundState.RESOLVED && cooldown) {
-    const nextRoundAt = crashTime + Number(cooldown)
-    timeRemaining = Math.max(0, nextRoundAt - currentTime)
-    nextPhase = "NEXT ROUND"
+    const nextRoundAt = crashTime + Number(cooldown);
+    timeRemaining = Math.max(0, nextRoundAt - currentTime);
+    nextPhase = "NEXT ROUND";
     if (timeRemaining === 0 && stateForCalculation === RoundState.RESOLVED) {
-      isWaitingForUpdate = true
+      isWaitingForUpdate = true;
     }
   }
 
   return {
     currentRoundId: currentRoundId ? Number(currentRoundId) : 0,
     roundState: displayState ?? roundState, // Return display state for UI
-    actualRoundState: roundState, // Keep actual state for reference
+    actualRoundState: roundState, // Export actual blockchain state for components that need immediate updates
     previousRoundState,
     startTime,
     lockTime,
@@ -237,7 +240,5 @@ export function useGameState() {
     isError: roundIdError || roundError,
     isAnimating,
     handleAnimationComplete,
-  }
-
-
+  };
 }

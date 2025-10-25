@@ -26,7 +26,7 @@ export function PlaceBetForm({
   const { address, isConnected } = useAccount();
   const [betAmount, setBetAmount] = useState("0.01");
   const [targetMultiplier, setTargetMultiplier] = useState("200");
-  const [autoCashout, setAutoCashout] = useState("0.02");
+//   const [autoCashout, setAutoCashout] = useState("0.02");
 
   const { data: hash, writeContract, isPending } = useWriteContract();
 
@@ -45,7 +45,7 @@ export function PlaceBetForm({
     try {
       const amount = parseEther(betAmount);
       const targetMult = Math.floor(Number.parseFloat(targetMultiplier));
-      const autoCash = parseEther(autoCashout);
+    //   const autoCash = parseEther(autoCashout);
 
       if (targetMult < 100) {
         toast.error("Invalid multiplier", {
@@ -54,18 +54,18 @@ export function PlaceBetForm({
         return;
       }
 
-      if (Number.parseFloat(autoCashout) <= Number.parseFloat(betAmount)) {
-        toast.error("Invalid auto cashout", {
-          description: "Auto cashout must be greater than bet amount",
-        });
-        return;
-      }
+    //   if (Number.parseFloat(autoCashout) <= Number.parseFloat(betAmount)) {
+    //     toast.error("Invalid auto cashout", {
+    //       description: "Auto cashout must be greater than bet amount",
+    //     });
+    //     return;
+    //   }
 
       writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: "placeBet",
-        args: [amount, BigInt(targetMult), autoCash],
+        args: [amount, BigInt(targetMult), amount * BigInt(targetMult)],
         value: amount,
       });
 
@@ -123,7 +123,7 @@ export function PlaceBetForm({
           </p>
         </div>
 
-        <div>
+        {/* <div>
           <Label htmlFor="autoCashout">Auto Cashout Amount (ETH)</Label>
           <Input
             id="autoCashout"
@@ -138,7 +138,7 @@ export function PlaceBetForm({
           <p className="text-xs text-muted-foreground mt-1">
             Must be greater than bet amount
           </p>
-        </div>
+        </div> */}
 
         {!isConnected ? (
           <Button className="w-full" size="lg" disabled>

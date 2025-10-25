@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { TrendingUp } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { RocketAnimation } from "./RocketAnimation"
 
 interface AnimatedCrashMultiplierProps {
   finalMultiplier: number
@@ -12,115 +12,101 @@ export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }
   const [currentMultiplier, setCurrentMultiplier] = useState(100) // Start at 1.00x
   const [isAnimating, setIsAnimating] = useState(true)
   const [hasCrashed, setHasCrashed] = useState(false)
+  const [progress, setProgress] = useState(0)
+
+  const onCompleteRef = useRef(onAnimationComplete)
 
   useEffect(() => {
-    if (!isAnimating) return
+    onCompleteRef.current = onAnimationComplete
+  }, [onAnimationComplete])
+
+  const hasStartedRef = useRef(false)
+
+  useEffect(() => {
+    if (hasStartedRef.current) return
+    hasStartedRef.current = true
 
     console.log("[v0] Starting crash animation to", finalMultiplier / 100, "x")
 
     const startMultiplier = 100 // 1.00x
     const endMultiplier = finalMultiplier
-    const duration = 4000 // 4 seconds for more suspense
-    const startTime = Date.now()
+    const duration = 5000 // 5 seconds total
+    const updateInterval = 50 // Update every 50ms for smooth animation
 
-    const animate = () => {
-      const elapsed = Date.now() - startTime
-      const progress = Math.min(elapsed / duration, 1)
+    let elapsed = 0
 
-      // Exponential easing: starts slow, accelerates dramatically
-      const exponentialProgress = Math.pow(progress, 2.5)
+    const interval = setInterval(() => {
+      elapsed += updateInterval
 
-      // Calculate current value with exponential growth
+      // Calculate progress (0 to 1)
+      const linearProgress = Math.min(elapsed / duration, 1)
+
+      // Using power of 3 for more dramatic effect
+      const exponentialProgress = Math.pow(linearProgress, 3)
+
+      setProgress(linearProgress)
+
+      // Calculate current multiplier value
       const range = endMultiplier - startMultiplier
-      let currentValue = startMultiplier + range * exponentialProgress
+      const currentValue = startMultiplier + range * exponentialProgress
 
-      // Add slight jitter for realism (less jitter as we approach the end)
-      const jitterAmount = (1 - progress) * 3
-      const jitter = (Math.random() - 0.5) * jitterAmount
-      currentValue = Math.max(100, currentValue + jitter)
+      setCurrentMultiplier(Math.round(currentValue))
 
-      setCurrentMultiplier(currentValue)
-
-      // Continue animation or stop at crash point
-      if (progress < 1) {
-        requestAnimationFrame(animate)
-      } else {
-        // Reached crash point
+      // Check if animation is complete
+      if (linearProgress >= 1) {
+        clearInterval(interval)
         setCurrentMultiplier(endMultiplier)
         setIsAnimating(false)
         setHasCrashed(true)
 
         console.log("[v0] Crash animation reached final multiplier:", endMultiplier / 100, "x")
 
-        // Show crash for 2 seconds before completing
+        // Show crash state for 2 seconds before completing
         setTimeout(() => {
           console.log("[v0] Calling animation complete callback")
-          onAnimationComplete?.()
+          onCompleteRef.current?.()
         }, 2000)
       }
-    }
+    }, updateInterval)
 
-    requestAnimationFrame(animate)
-  }, [finalMultiplier, isAnimating, onAnimationComplete])
+    return () => clearInterval(interval)
+  }, [finalMultiplier]) 
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/98 backdrop-blur-md">
-      <div className="text-center space-y-8 animate-in fade-in zoom-in duration-500">
-        {/* Multiplier Display */}
-        <div className="relative">
-          <div
-            className={`text-[12rem] font-bold font-mono transition-all duration-300 ${
-              hasCrashed ? "text-destructive scale-125 animate-pulse" : "text-primary"
-            }`}
-            style={{
-              textShadow: hasCrashed
-                ? "0 0 60px rgba(239, 68, 68, 0.8), 0 0 100px rgba(239, 68, 68, 0.4)"
-                : "0 0 40px rgba(34, 197, 94, 0.5)",
-              lineHeight: 1,
-            }}
-          >
-            {(currentMultiplier / 100).toFixed(2)}x
-          </div>
+    <div className="w-full space-y-6 py-8">
+      {/* Rocket Animation */}
+      <RocketAnimation isActive={isAnimating} progress={progress} />
 
-          {/* Pulsing icon */}
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2">
-            <TrendingUp
-              className={`w-20 h-20 transition-all duration-300 ${
-                hasCrashed ? "text-destructive animate-bounce" : "text-primary animate-pulse"
-              }`}
-            />
-          </div>
+      {/* Multiplier Display */}
+      <div className="text-center space-y-4">
+        <div
+          className={`text-8xl md:text-9xl font-bold font-mono transition-all duration-300 ${
+            hasCrashed ? "text-destructive scale-110" : "text-primary"
+          }`}
+          style={{
+            textShadow: hasCrashed
+              ? "0 0 40px rgba(239, 68, 68, 0.8), 0 0 80px rgba(239, 68, 68, 0.4)"
+              : "0 0 30px rgba(34, 197, 94, 0.5)",
+            lineHeight: 1,
+          }}
+        >
+          {(currentMultiplier / 100).toFixed(2)}x
         </div>
 
         {/* Status Text */}
-        <div className="space-y-3">
-          {isAnimating ? (
-            <>
-              <p className="text-3xl font-bold text-primary animate-pulse">🚀 Moonshot in Progress...</p>
-              <p className="text-lg text-muted-foreground">Watch the multiplier climb!</p>
-            </>
-          ) : (
-            <>
-              <p className="text-5xl font-bold text-destructive animate-in zoom-in duration-300">💥 CRASHED!</p>
-              <p className="text-2xl text-muted-foreground">Final multiplier: {(finalMultiplier / 100).toFixed(2)}x</p>
-            </>
-          )}
-        </div>
+        {isAnimating ? (
+          <p className="text-2xl font-bold text-primary animate-pulse">Moonshot in Progress...</p>
+        ) : (
+          <p className="text-4xl font-bold text-destructive animate-in zoom-in duration-300">CRASHED!</p>
+        )}
+      </div>
 
-        {/* Animated background effect */}
-        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      {/* Progress bar */}
+      <div className="w-full max-w-md mx-auto">
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className={`absolute inset-0 transition-all duration-1000 ${
-              hasCrashed
-                ? "bg-gradient-to-br from-destructive/30 to-destructive/10"
-                : "bg-gradient-to-br from-primary/30 to-primary/10"
-            }`}
-          />
-          {/* Radial pulse effect */}
-          <div
-            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl transition-all duration-1000 ${
-              hasCrashed ? "bg-destructive/20 scale-150" : "bg-primary/20 scale-100 animate-pulse"
-            }`}
+            className={`h-full transition-all duration-100 ${hasCrashed ? "bg-destructive" : "bg-primary"}`}
+            style={{ width: `${progress * 100}%` }}
           />
         </div>
       </div>
