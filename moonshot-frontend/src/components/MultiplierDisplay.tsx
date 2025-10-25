@@ -2,7 +2,7 @@
 
 import { RoundState } from "../constants"
 import { TrendingUp } from "lucide-react"
-import { AnimatedCrashMultiplier } from "./AnimatedCrashMultiplier"
+import { RocketCrashAnimation } from "./RocketCrashAnimation"
 
 interface MultiplierDisplayProps {
   crashMultiplier: number
@@ -19,12 +19,8 @@ export function MultiplierDisplay({
   isAnimating,
   onAnimationComplete,
 }: MultiplierDisplayProps) {
-  if (
-    isAnimating &&
-    (actualRoundState === RoundState.RESOLVED || roundState === RoundState.RESOLVED) &&
-    crashMultiplier > 0
-  ) {
-    return <AnimatedCrashMultiplier finalMultiplier={crashMultiplier} onAnimationComplete={onAnimationComplete} />
+  if (isAnimating && crashMultiplier > 0) {
+    return <RocketCrashAnimation finalMultiplier={crashMultiplier / 100} onAnimationComplete={onAnimationComplete} />
   }
 
   if (roundState === RoundState.RESOLVED && crashMultiplier > 0) {

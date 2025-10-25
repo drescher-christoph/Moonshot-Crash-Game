@@ -17,7 +17,7 @@ export default function Header() {
           />
           {/* <h2 className="font-bold text-3xl">Moonshot</h2> */}
           <a
-            href="https://github.com/drescher-christoph/Coinflip-Dapp" 
+            href="https://github.com/drescher-christoph/Moonshot-Crash-Game" 
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"

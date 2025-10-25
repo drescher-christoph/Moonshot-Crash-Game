@@ -9,7 +9,7 @@ interface AnimatedCrashMultiplierProps {
 }
 
 export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }: AnimatedCrashMultiplierProps) {
-  const [currentMultiplier, setCurrentMultiplier] = useState(100) // Start at 1.00x
+  const [currentMultiplier, setCurrentMultiplier] = useState(100)
   const [isAnimating, setIsAnimating] = useState(true)
   const [hasCrashed, setHasCrashed] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -28,31 +28,23 @@ export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }
 
     console.log("[v0] Starting crash animation to", finalMultiplier / 100, "x")
 
-    const startMultiplier = 100 // 1.00x
+    const startMultiplier = 100
     const endMultiplier = finalMultiplier
-    const duration = 5000 // 5 seconds total
-    const updateInterval = 50 // Update every 50ms for smooth animation
+    const duration = 5000
+    const updateInterval = 50
 
     let elapsed = 0
 
     const interval = setInterval(() => {
       elapsed += updateInterval
-
-      // Calculate progress (0 to 1)
       const linearProgress = Math.min(elapsed / duration, 1)
-
-      // Using power of 3 for more dramatic effect
       const exponentialProgress = Math.pow(linearProgress, 3)
 
       setProgress(linearProgress)
-
-      // Calculate current multiplier value
       const range = endMultiplier - startMultiplier
       const currentValue = startMultiplier + range * exponentialProgress
-
       setCurrentMultiplier(Math.round(currentValue))
 
-      // Check if animation is complete
       if (linearProgress >= 1) {
         clearInterval(interval)
         setCurrentMultiplier(endMultiplier)
@@ -61,7 +53,6 @@ export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }
 
         console.log("[v0] Crash animation reached final multiplier:", endMultiplier / 100, "x")
 
-        // Show crash state for 2 seconds before completing
         setTimeout(() => {
           console.log("[v0] Calling animation complete callback")
           onCompleteRef.current?.()
@@ -70,14 +61,12 @@ export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }
     }, updateInterval)
 
     return () => clearInterval(interval)
-  }, [finalMultiplier]) 
+  }, [finalMultiplier])
 
   return (
     <div className="w-full space-y-6 py-8">
-      {/* Rocket Animation */}
       <RocketAnimation isActive={isAnimating} progress={progress} />
 
-      {/* Multiplier Display */}
       <div className="text-center space-y-4">
         <div
           className={`text-8xl md:text-9xl font-bold font-mono transition-all duration-300 ${
@@ -93,7 +82,6 @@ export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }
           {(currentMultiplier / 100).toFixed(2)}x
         </div>
 
-        {/* Status Text */}
         {isAnimating ? (
           <p className="text-2xl font-bold text-primary animate-pulse">Moonshot in Progress...</p>
         ) : (
@@ -101,7 +89,6 @@ export function AnimatedCrashMultiplier({ finalMultiplier, onAnimationComplete }
         )}
       </div>
 
-      {/* Progress bar */}
       <div className="w-full max-w-md mx-auto">
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
